@@ -1,0 +1,125 @@
+package io;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class CSVMain {
+
+    public static void main(String[] args) {
+        // Check if the correct number of arguments is provided
+        if (args.length < 2) {
+            System.out.println("Usage: java CSVMain <input_file> <output_file>");
+            return;
+        }
+
+        String inputFilePath = args[0];
+        String outputFilePath = args[1];
+
+        try {
+            List<String[]> data = readCSV(inputFilePath);
+            Map<String, AppRating> appRatings = processAppData(data);
+            writeOutput(outputFilePath, appRatings);
+        } catch (IOException e) {
+            System.out.println("An error occurred: " + e.getMessage());
+        }
+    }
+
+    // Method to read the CSV file
+    private static List<String[]> readCSV(String filePath) throws IOException {
+        List<String[]> data = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] row = line.split(",");
+                data.add(row);
+            }
+        }
+        return data;
+    }
+
+    // Method to process app data and calculate ratings
+    private static Map<String, AppRating> processAppData(List<String[]> data) {
+        Map<String, AppRating> appRatings = new HashMap<>();
+
+        for (String[] row : data) {
+            if (row.length < 3) continue; // Skip rows with insufficient columns
+
+            String appName = row[0];
+            String category = row[1];
+            double rating = parseRating(row[2], appName);
+            if (rating < 0) continue; // Skip invalid ratings
+
+            appRatings.putIfAbsent(category, new AppRating(appName, rating, appName, rating));
+            AppRating current = appRatings.get(category);
+            updateAppRatings(current, appName, rating);
+        }
+        return appRatings;
+    }
+
+    // Method to parse rating from String to double
+    private static double parseRating(String ratingStr, String appName) {
+        try {
+            return Double.parseDouble(ratingStr);
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid rating format for app: " + appName);
+            return -1; // Return -1 to indicate invalid rating
+        }
+    }
+
+    // Method to update highest, lowest, and total ratings
+    private static void updateAppRatings(AppRating current, String appName, double rating) {
+        if (rating > current.highestRating) {
+            current.highestRatedApp = appName;
+            current.highestRating = rating;
+        }
+        if (rating < current.lowestRating) {
+            current.lowestRatedApp = appName;
+            current.lowestRating = rating;
+        }
+        current.totalRating += rating;
+        current.count++;
+    }
+
+    // Method to write the results to an output file
+    private static void writeOutput(String filePath, Map<String, AppRating> appRatings) throws IOException {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            for (Map.Entry<String, AppRating> entry : appRatings.entrySet()) {
+                String category = entry.getKey();
+                AppRating rating = entry.getValue();
+                double averageRating = rating.totalRating / rating.count;
+
+                writer.write("Category: " + category);
+                writer.newLine();
+                writer.write("Highest Rated: " + rating.highestRatedApp + " (" + rating.highestRating + ")");
+                writer.newLine();
+                writer.write("Lowest Rated: " + rating.lowestRatedApp + " (" + rating.lowestRating + ")");
+                writer.newLine();
+                writer.write("Average Rating: " + averageRating);
+                writer.newLine();
+                writer.newLine();
+            }
+        }
+    }
+
+    // Inner class to hold app rating information
+    static class AppRating {
+        String highestRatedApp;
+        double highestRating;
+        String lowestRatedApp;
+        double lowestRating;
+        double totalRating;
+        int count;
+
+        AppRating(String highestRatedApp, double highestRating, String lowestRatedApp, double lowestRating) {
+            this.highestRatedApp = highestRatedApp;
+            this.highestRating = highestRating;
+            this.lowestRatedApp = lowestRatedApp;
+            this.lowestRating = lowestRating;
+            this.totalRating = highestRating; // Initialize totalRating with the highest rating
+            this.count = 1; // Initialize count to 1 for the first app
+        }
+    }
+}
